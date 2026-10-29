@@ -48,12 +48,34 @@ CREATE TABLE IF NOT EXISTS pertanyaan_tak_terjawab (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS data_tabel (
+  id            BIGSERIAL PRIMARY KEY,
+  nama          VARCHAR(255) NOT NULL,
+  deskripsi     TEXT,
+  jumlah_baris  INT NOT NULL DEFAULT 0,
+  jumlah_kolom  INT NOT NULL DEFAULT 0,
+  link_gdrive   TEXT,
+  isi_data      JSONB,
+  is_published  BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS data_informasi (
+  id            BIGSERIAL PRIMARY KEY,
+  judul         VARCHAR(255) NOT NULL,
+  konten        TEXT NOT NULL,
+  is_published  BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ
+);
+
 GRANT USAGE ON SCHEMA public TO agent_ro;
-GRANT SELECT ON wilayah, indikator, data_indikator TO agent_ro;
+GRANT SELECT ON wilayah, indikator, data_indikator, data_tabel, data_informasi TO agent_ro;
 GRANT INSERT ON pertanyaan_tak_terjawab TO agent_ro;
 GRANT USAGE, SELECT ON SEQUENCE pertanyaan_tak_terjawab_id_seq TO agent_ro;
 
-REVOKE UPDATE, DELETE ON wilayah, indikator, data_indikator FROM agent_ro;
+REVOKE UPDATE, DELETE ON wilayah, indikator, data_indikator, data_tabel, data_informasi FROM agent_ro;
 REVOKE UPDATE, DELETE ON pertanyaan_tak_terjawab FROM agent_ro;
 
 CREATE INDEX IF NOT EXISTS idx_indikator_nama_trgm ON indikator USING gin (nama gin_trgm_ops);

@@ -9,12 +9,10 @@ load_dotenv()
 FONNTE_TOKEN = os.getenv("FONNTE_TOKEN")
 OPENCLAW_URL = "http://127.0.0.1:18789/v1/chat/completions"
 GATEWAY_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN")
-
-# --- TAMBAHKAN URL DB UNTUK BRIDGE ---
-# (Pastikan user 'postgres' atau user bridge punya akses INSERT ke log_percakapan)
 DB_URL = os.getenv("DB_BRIDGE_URL")
 
 app = FastAPI()
+
 
 async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"):
     headers = {
@@ -22,18 +20,47 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
         "Content-Type": "application/json",
         "x-openclaw-agent-id": "main",
     }
+
+    # Ambil riwayat percakapan sebelumnya untuk sender ini (multi-turn context)
+    messages_payload = []
+    try:
+        with psycopg.connect(DB_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_message, agent_reply 
+                    FROM log_percakapan 
+                    WHERE sender = %s 
+                    ORDER BY id DESC 
+                    LIMIT 6
+                    """,
+                    (sender,)
+                )
+                past_logs = cur.fetchall()
+                # Balikkan urutan agar kronologis dari yang terlama ke terbaru
+                for u_msg, a_reply in reversed(past_logs):
+                    if u_msg:
+                        messages_payload.append({"role": "user", "content": u_msg})
+                    if a_reply:
+                        messages_payload.append({"role": "assistant", "content": a_reply})
+    except Exception as hist_err:
+        print(f"[{sender}] Gagal membaca riwayat percakapan: {hist_err}")
+
+    # Tambahkan pesan saat ini
+    messages_payload.append({"role": "user", "content": message})
+
     payload = {
         "model": "openclaw:main",
-        "messages": [{"role": "user", "content": message}],
+        "messages": messages_payload,
         "stream": False,
     }
 
     reply_text = ""
     kategori = "Umum"
-    
+
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            print(f"[{sender}] Memanggil OpenClaw...")
+            print(f"[{sender}] Memanggil OpenClaw dengan {len(messages_payload)} pesan konteks...")
             resp = await client.post(OPENCLAW_URL, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
@@ -43,28 +70,31 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
             except (KeyError, IndexError):
                 reply_text = "Maaf, sistem sedang sibuk."
 
-            # Tentukan kategori sederhana (bisa dikembangkan nanti)
-            if "tidak ditemukan" in reply_text.lower() or "maaf" in reply_text.lower():
+            # Tentukan kategori
+            reply_lower = reply_text.lower()
+            msg_lower = message.lower()
+            if "tidak ditemukan" in reply_lower or "maaf" in reply_lower:
                 kategori = "Tidak Terjawab"
-            elif "penduduk" in message.lower() or "miskin" in message.lower():
+            elif "drive.google.com" in reply_text or "tabel" in reply_lower:
+                kategori = "Data Tabel"
+            elif any(w in msg_lower for w in ["penduduk", "inflasi", "miskin", "pdrb", "ipm"]):
                 kategori = "Data Statistik"
 
-            # ==========================================
-            # --- TAMBAHAN FASE 3: TENTUKAN PERIHAL ---
-            # ==========================================
+            # Tentukan perihal
             perihal = "Pertanyaan Umum"
-            msg_lower = message.lower()
-            
-            if "minta" in msg_lower or "file" in msg_lower or "unduh" in msg_lower or "link" in msg_lower:
+            if any(w in msg_lower for w in ["minta", "file", "unduh", "link", "gdrive", "download", "excel", "spreadsheet"]):
                 perihal = "Permintaan File Data"
-            elif "penduduk" in msg_lower or "inflasi" in msg_lower or "miskin" in msg_lower:
-                perihal = f"Tanya Data ({message[:30]}...)"
+            elif any(w in msg_lower for w in ["honor", "pml", "keperluan", "nama saya"]):
+                perihal = "Permintaan File Data"
+            elif any(w in msg_lower for w in ["kegiatan", "acara", "upacara", "agenda", "alamat", "jam", "kantor"]):
+                perihal = f"Informasi Layanan/Kegiatan ({message[:25]}...)"
+            elif any(w in msg_lower for w in ["penduduk", "inflasi", "miskin", "pdrb", "ipm"]):
+                perihal = f"Tanya Data ({message[:25]}...)"
 
-            # --- SIMPAN KE DATABASE ---
+            # Simpan log ke database
             try:
                 with psycopg.connect(DB_URL) as conn:
                     with conn.cursor() as cur:
-                        # Perbarui query INSERT untuk menyertakan kolom 'perihal'
                         cur.execute(
                             "INSERT INTO log_percakapan (sender, pushname, perihal, user_message, agent_reply, kategori_permintaan) "
                             "VALUES (%s, %s, %s, %s, %s, %s)",
@@ -87,6 +117,7 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
     except Exception as e:
         print(f"[{sender}] Error: {e}")
 
+
 @app.post("/webhook")
 async def fonnte_webhook(request: Request, background_tasks: BackgroundTasks):
     raw = await request.body()
@@ -98,7 +129,7 @@ async def fonnte_webhook(request: Request, background_tasks: BackgroundTasks):
         data = json.loads(raw)
         sender = data.get("sender")
         message = data.get("message")
-        pushname = data.get("pushname", "Unknown") # <-- Ambil nama WA
+        pushname = data.get("pushname", "Unknown")
     except Exception:
         pass
 
@@ -106,6 +137,7 @@ async def fonnte_webhook(request: Request, background_tasks: BackgroundTasks):
         background_tasks.add_task(process_and_reply, sender, message, pushname)
 
     return {"status": "ok"}
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,7 +2,7 @@ import psycopg
 import pytest
 from bps_mcp.bps_data import db
 from bps_mcp.bps_data.config import load_db_url
-from bps_mcp.bps_data.core import indikator, wilayah, data, tak_terjawab
+from bps_mcp.bps_data.core import indikator, wilayah, data, tak_terjawab, tabel, informasi
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -85,3 +85,18 @@ def test_sql_injection():
 def test_catat_tak_terjawab(urls=None):
     r = tak_terjawab.catat_tak_terjawab("test tools", alasan="unit")
     assert r["status"] == "ok" and r["data"]["id"] > 0
+
+
+def test_tabel_cari_dan_ambil_link():
+    # Test validasi butuh_info
+    r_info = tabel.ambil_link_gdrive("data")
+    assert r_info["status"] == "butuh_info"
+
+    # Test pencarian data tabel
+    r_tab = tabel.cari_data_tabel("data")
+    assert r_tab["status"] == "success"
+
+
+def test_informasi_cari():
+    r_inf = informasi.cari_informasi("kegiatan")
+    assert r_inf["status"] in ("ok", "tidak_ditemukan")

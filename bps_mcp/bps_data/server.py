@@ -17,29 +17,28 @@ from bps_mcp.bps_data.core import tak_terjawab as core_tt
 from bps_mcp.bps_data.core import alihkan as core_alihkan
 from bps_mcp.bps_data.core import informasi as core_info
 from bps_mcp.bps_data.core import tabel as core_tabel
+
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger("bps_data")
 
 db.init_pool(load_db_url())
 mcp = FastMCP("bps_data")
-# Tambahkan ini di bagian import
 
 @mcp.tool()
 def ambil_link_gdrive(nama_tabel: str, nama_pemohon: str = None, keperluan: str = None) -> dict:
-    """
-    Gunakan tool ini HANYA JIKA pengguna sudah memberikan Nama dan Keperluannya untuk meminta file data.
-    """
+    """Gunakan tool ini jika pengguna meminta file/link Google Drive data tabel, dan nama serta keperluan sudah diisi."""
     return core_tabel.ambil_link_gdrive(nama_tabel, nama_pemohon, keperluan)
 
 @mcp.tool()
 def cari_data_tabel(kata_kunci: str) -> dict:
     """Gunakan tool ini jika pengguna menanyakan data statistik berbentuk tabel, dataset, jumlah baris/kolom, atau preview data."""
     return core_tabel.cari_data_tabel(kata_kunci)
+
 @mcp.tool()
 def cari_informasi(kata_kunci: str) -> dict:
-    """Gunakan tool ini jika pengguna menanyakan informasi umum BPS (alamat, jam operasional, profil). Bukan untuk data angka."""
+    """Gunakan tool ini jika pengguna menanyakan informasi umum BPS (alamat kantor, jam operasional, profil, kegiatan kantor, agenda, upacara, acara, pengumuman BPS Batanghari). Bukan untuk data angka statistik."""
     return core_info.cari_informasi(kata_kunci)
-# Tambahkan ini di bagian tool
+
 @mcp.tool()
 def alihkan_ke_petugas(pertanyaan: str, ref: str) -> dict:
     """Gunakan tool ini jika pengguna meminta bantuan manusia, atau pertanyaannya terlalu rumit. ref adalah nomor WhatsApp pengguna."""
@@ -50,18 +49,15 @@ def cari_indikator(kata_kunci: str, limit: int = 5) -> dict:
     """Cari indikator BPS berdasarkan nama atau sinonim. Panggil ini lebih dulu untuk mendapatkan indikator_id."""
     return core_ind.cari_indikator(kata_kunci, limit)
 
-
 @mcp.tool()
 def cari_wilayah(kata_kunci: str, level: str | None = None, limit: int = 5) -> dict:
     """Cari wilayah (provinsi/kabkota/kecamatan/desa) berdasarkan nama. Panggil untuk mendapatkan wilayah_id."""
     return core_wil.cari_wilayah(kata_kunci, level, limit)
 
-
 @mcp.tool()
 def daftar_periode_tersedia(indikator_id: int, wilayah_id: int | None = None) -> dict:
     """Daftar periode yang tersedia untuk indikator (dan wilayah opsional). Pakai jika periode belum pasti."""
     return core_data.daftar_periode_tersedia(indikator_id, wilayah_id)
-
 
 @mcp.tool()
 def ambil_data(indikator_id: int, wilayah_id: int, periode: str,
@@ -69,13 +65,11 @@ def ambil_data(indikator_id: int, wilayah_id: int, periode: str,
     """Ambil satu nilai statistik: nilai, satuan, periode, dan sumber. Jangan menebak jika tidak tersedia."""
     return core_data.ambil_data(indikator_id, wilayah_id, periode, periode_tipe)
 
-
 @mcp.tool()
 def catat_tak_terjawab(pertanyaan: str, alasan: str | None = None,
                        ref: str | None = None) -> dict:
     """Catat pertanyaan yang tidak dapat dijawab karena data tidak dipublikasikan atau tidak ditemukan."""
     return core_tt.catat_tak_terjawab(pertanyaan, alasan, ref)
-
 
 if __name__ == "__main__":
     mcp.run()
