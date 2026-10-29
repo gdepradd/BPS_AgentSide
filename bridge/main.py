@@ -12,7 +12,7 @@ GATEWAY_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN")
 
 # --- TAMBAHKAN URL DB UNTUK BRIDGE ---
 # (Pastikan user 'postgres' atau user bridge punya akses INSERT ke log_percakapan)
-DB_URL = os.getenv("DB_BRIDGE_URL", "postgresql://postgres:postgres1504@localhost:5432/bps_agent")
+DB_URL = os.getenv("DB_BRIDGE_URL")
 
 app = FastAPI()
 

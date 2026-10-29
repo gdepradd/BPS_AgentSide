@@ -7,6 +7,7 @@ __pycache__/
 .pytest_cache/
 agent/.openclaw_state/
 agent/openclaw.json
+agent\openclaw.json.last-good
 *.bak
 diag*-output.txt
 schema_config.json
