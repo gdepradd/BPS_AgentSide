@@ -1,0 +1,29 @@
+{
+  "gateway": { "mode": "local" },
+  "agents": { "defaults": { "model": { "primary": "ollama/gemma4:31b" } } },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "https://ollama.com",
+        "apiKey": "GANTI_DENGAN_API_KEY_OLLAMA",
+        "api": "ollama",
+        "timeoutSeconds": 600,
+        "models": [
+          {
+            "id": "gemma4:31b",
+            "name": "gemma4:31b",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 8192,
+            "maxTokens": 512
+          }
+        ]
+      }
+    }
+  },
+  "memory": { "search": { "enabled": false } },
+  "tools": {
+    "deny": ["bash", "exec", "read", "write", "edit", "browser",
+             "web_search", "web_fetch", "canvas", "cron", "memory"]
+  }
+}
