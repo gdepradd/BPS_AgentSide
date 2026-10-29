@@ -49,17 +49,29 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
             elif "penduduk" in message.lower() or "miskin" in message.lower():
                 kategori = "Data Statistik"
 
+            # ==========================================
+            # --- TAMBAHAN FASE 3: TENTUKAN PERIHAL ---
+            # ==========================================
+            perihal = "Pertanyaan Umum"
+            msg_lower = message.lower()
+            
+            if "minta" in msg_lower or "file" in msg_lower or "unduh" in msg_lower or "link" in msg_lower:
+                perihal = "Permintaan File Data"
+            elif "penduduk" in msg_lower or "inflasi" in msg_lower or "miskin" in msg_lower:
+                perihal = f"Tanya Data ({message[:30]}...)"
+
             # --- SIMPAN KE DATABASE ---
             try:
                 with psycopg.connect(DB_URL) as conn:
                     with conn.cursor() as cur:
+                        # Perbarui query INSERT untuk menyertakan kolom 'perihal'
                         cur.execute(
-                            "INSERT INTO log_percakapan (sender, pushname, user_message, agent_reply, kategori_permintaan) "
-                            "VALUES (%s, %s, %s, %s, %s)",
-                            (sender, pushname, message, reply_text, kategori)
+                            "INSERT INTO log_percakapan (sender, pushname, perihal, user_message, agent_reply, kategori_permintaan) "
+                            "VALUES (%s, %s, %s, %s, %s, %s)",
+                            (sender, pushname, perihal, message, reply_text, kategori)
                         )
                     conn.commit()
-                print(f"[{sender}] Log percakapan tersimpan ke DB.")
+                print(f"[{sender}] Log percakapan tersimpan ke DB (Perihal: {perihal}).")
             except Exception as db_err:
                 print(f"[{sender}] Gagal simpan ke DB: {db_err}")
 

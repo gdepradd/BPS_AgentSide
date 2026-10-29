@@ -16,7 +16,7 @@ from bps_mcp.bps_data.core import data      as core_data
 from bps_mcp.bps_data.core import tak_terjawab as core_tt
 from bps_mcp.bps_data.core import alihkan as core_alihkan
 from bps_mcp.bps_data.core import informasi as core_info
-
+from bps_mcp.bps_data.core import tabel as core_tabel
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger("bps_data")
 
@@ -24,6 +24,17 @@ db.init_pool(load_db_url())
 mcp = FastMCP("bps_data")
 # Tambahkan ini di bagian import
 
+@mcp.tool()
+def ambil_link_gdrive(nama_tabel: str, nama_pemohon: str = None, keperluan: str = None) -> dict:
+    """
+    Gunakan tool ini HANYA JIKA pengguna sudah memberikan Nama dan Keperluannya untuk meminta file data.
+    """
+    return core_tabel.ambil_link_gdrive(nama_tabel, nama_pemohon, keperluan)
+
+@mcp.tool()
+def cari_data_tabel(kata_kunci: str) -> dict:
+    """Gunakan tool ini jika pengguna menanyakan data statistik berbentuk tabel, dataset, jumlah baris/kolom, atau preview data."""
+    return core_tabel.cari_data_tabel(kata_kunci)
 @mcp.tool()
 def cari_informasi(kata_kunci: str) -> dict:
     """Gunakan tool ini jika pengguna menanyakan informasi umum BPS (alamat, jam operasional, profil). Bukan untuk data angka."""
