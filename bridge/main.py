@@ -185,6 +185,22 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
                                 )
                             )
                             print(f"[{sender}] Sesi percakapan baru dibuat (Perihal: {perihal}).")
+
+                        # Hubungkan nomor sender ke catatan permintaan_data jika ada link GDrive yang baru dikirim
+                        if "drive.google.com" in reply_text:
+                            try:
+                                cur.execute(
+                                    """
+                                    UPDATE permintaan_data 
+                                    SET sender = %s 
+                                    WHERE sender IS NULL 
+                                      AND created_at >= NOW() - INTERVAL '5 minutes'
+                                    """,
+                                    (sender,)
+                                )
+                            except Exception:
+                                pass
+
                     conn.commit()
             except Exception as db_err:
                 print(f"[{sender}] Gagal simpan sesi ke DB: {db_err}")

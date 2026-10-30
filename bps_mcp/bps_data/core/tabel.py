@@ -120,6 +120,18 @@ def ambil_link_gdrive(nama_tabel: str, nama_pemohon: str = None, keperluan: str 
                     result = cur.fetchone()
 
             if result and result.get("link_gdrive"):
+                # Catat ke tabel permintaan_data untuk rekapitulasi dasbor
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO permintaan_data (data_tabel_id, nama_data, nama_pemohon, keperluan, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, NOW(), NOW())
+                        """,
+                        (result["id"], result["nama"], nama_pemohon, keperluan),
+                    )
+                except Exception as log_err:
+                    print(f"Catatan: Gagal mencatat permintaan_data: {log_err}")
+
                 return {
                     "status": "success",
                     "nama_tabel": result["nama"],
