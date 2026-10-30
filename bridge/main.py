@@ -26,7 +26,7 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
     # Syarat sesi aktif:
     # - sender = %s
     # - DATE(created_at) = CURRENT_DATE (hari yang sama)
-    # - COALESCE(updated_at, created_at) >= NOW() - INTERVAL '30 minutes' (jeda aktif < 30 menit)
+    # - COALESCE(updated_at, created_at) >= NOW() - INTERVAL '30 minutes' (jeda inaktivitas < 30 menit)
     active_session_id = None
     existing_messages = []
     current_perihal = None
@@ -52,7 +52,6 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
                     active_session_id = row[0]
                     current_perihal = row[1]
                     current_kategori = row[2]
-                    # Parse messages JSON array
                     raw_messages = row[3]
                     if isinstance(raw_messages, str):
                         try:
@@ -84,7 +83,6 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
     }
 
     reply_text = ""
-    kategori = current_kategori or "Umum"
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -99,27 +97,38 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
             except (KeyError, IndexError):
                 reply_text = "Maaf, sistem sedang sibuk."
 
-            # Tentukan kategori
+            # Tentukan kategori & perihal yang akurat
             reply_lower = reply_text.lower()
             msg_lower = message.lower()
-            if "drive.google.com" in reply_text or "tabel" in reply_lower:
-                kategori = "Data Tabel"
-            elif any(w in msg_lower for w in ["penduduk", "inflasi", "miskin", "pdrb", "ipm"]):
-                kategori = "Data Statistik"
-            elif "tidak ditemukan" in reply_lower or "maaf" in reply_lower:
-                if not current_kategori or current_kategori == "Umum":
-                    kategori = "Tidak Terjawab"
 
-            # Tentukan perihal (perbarui jika ada topik yang lebih spesifik)
+            # 1. Kategori Data Tabel / Permintaan File
+            if any(w in msg_lower for w in ["minta", "file", "unduh", "link", "gdrive", "download", "excel", "spreadsheet", "tabel", "honor", "pml"]) or "drive.google.com" in reply_text or "tabel" in reply_lower:
+                kategori = "Data Tabel"
+            # 2. Kategori Data Statistik (Angka / Indikator BPS)
+            elif any(w in msg_lower for w in ["penduduk", "inflasi", "miskin", "pdrb", "ipm", "angka", "jumlah", "persentase"]):
+                kategori = "Data Statistik"
+            # 3. Kategori Informasi & Layanan Kantor BPS
+            elif any(w in msg_lower for w in ["kegiatan", "acara", "upacara", "agenda", "alamat", "jam", "kantor", "buka", "tutup", "layanan", "pst", "magang", "profil"]):
+                kategori = "Informasi Layanan"
+            # 4. Kategori Data Belum Tersedia (hanya jika data benar-benar tidak ada dan bukan sedang menanyakan nama/keperluan)
+            elif ("tidak ditemukan" in reply_lower or "belum tersedia" in reply_lower or "belum dipublikasikan" in reply_lower) and "nama" not in reply_lower:
+                kategori = "Data Belum Tersedia"
+            # 5. Kategori default
+            else:
+                kategori = current_kategori or "Layanan Umum"
+
+            # Tentukan perihal sesi (update jika topik percakapan bertambah spesifik)
             perihal = current_perihal or "Pertanyaan Umum"
             if any(w in msg_lower for w in ["minta", "file", "unduh", "link", "gdrive", "download", "excel", "spreadsheet", "honor", "pml"]):
                 perihal = "Permintaan File Data"
-            elif any(w in msg_lower for w in ["kegiatan", "acara", "upacara", "agenda", "alamat", "jam", "kantor"]):
-                perihal = f"Informasi Layanan/Kegiatan ({message[:25]}...)"
+            elif any(w in msg_lower for w in ["kegiatan", "acara", "upacara", "agenda"]):
+                perihal = f"Info Kegiatan ({message[:25]}...)"
+            elif any(w in msg_lower for w in ["alamat", "jam", "kantor", "buka", "tutup", "profil"]):
+                perihal = f"Info Layanan ({message[:25]}...)"
             elif any(w in msg_lower for w in ["penduduk", "inflasi", "miskin", "pdrb", "ipm"]):
                 perihal = f"Tanya Data ({message[:25]}...)"
 
-            # Buat turn baru
+            # Buat objek turn baru
             new_turn = {
                 "user_message": message,
                 "agent_reply": reply_text,
@@ -132,7 +141,7 @@ async def process_and_reply(sender: str, message: str, pushname: str = "Unknown"
                 with psycopg.connect(DB_URL) as conn:
                     with conn.cursor() as cur:
                         if active_session_id:
-                            # Sesi masih aktif: gabungkan pesan ke sesi ini
+                            # Sesi masih aktif: gabungkan turn pesan ke baris sesi ini
                             cur.execute(
                                 """
                                 UPDATE log_percakapan 
